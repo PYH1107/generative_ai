@@ -7,7 +7,9 @@ This essay will discuss the difference between Machine Learning and GAN with the
 Entropy 測量的是概率分佈中的不確定性或信息量
 
 ### Shanon Entropy
+
 $$H(p) = \mathbb{E}_p[-\log p] = -\sum_{x \in X} p(x)\log p(x)$$
+
 - 這描述了一個機率分佈的**不確定性**。
 
 
