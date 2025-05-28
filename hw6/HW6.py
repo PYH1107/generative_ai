@@ -1,14 +1,17 @@
 import gradio as gr
-import openai
+from openai import OpenAI  # 新版本的導入方式
 import requests
 import json
 import os
 import time
 from typing import List, Tuple
+from dotenv import load_dotenv
+from groq import Groq
+load_dotenv()
 
-# 設置 API 密鑰
-openai.api_key = os.getenv("OPENAI_API_KEY")
-GROK_API_KEY = os.getenv("GROK_API_KEY")
+# 設置 API 密鑰 - 新版本的方式
+openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
 class AICharacter:
     def __init__(self, name: str, personality: str, model_type: str):
@@ -39,13 +42,13 @@ character_b = AICharacter(
     - 用理性的外衣包裝尖刻的批評
     - 喜歡質疑一切，包括對方的觀點
     請保持這個人設，用哲學式的毒舌方式回應對方。""",
-    model_type="grok"
+    model_type="groq"
 )
 
 def call_openai_api(messages: List[dict]) -> str:
-    """調用 OpenAI API"""
+    """調用 OpenAI API - 使用新版本格式"""
     try:
-        response = openai.ChatCompletion.create(
+        response = openai_client.chat.completions.create(
             model="gpt-4",
             messages=messages,
             max_tokens=300,
@@ -55,34 +58,67 @@ def call_openai_api(messages: List[dict]) -> str:
     except Exception as e:
         return f"OpenAI API 錯誤: {str(e)}"
 
-def call_grok_api(messages: List[dict]) -> str:
-    """調用 Grok API"""
+def call_groq_api(messages: List[dict]) -> str:
+    """使用 Groq SDK 調用 Llama3 模型"""
     try:
+        response = groq_client.chat.completions.create(
+            model="llama3-70b-8192",  # Groq 提供的高速模型
+            messages=messages,
+            temperature=0.8,
+            max_tokens=300
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        return f"Grok API 錯誤: {str(e)}"
+
+
+def test_openai_connection() -> bool:
+    """測試 OpenAI API 連接"""
+    try:
+        response = openai_client.chat.completions.create(
+            model="gpt-3.5-turbo",  # 使用較便宜的模型測試
+            messages=[{"role": "user", "content": "測試"}],
+            max_tokens=5
+        )
+        if response.choices[0].message.content:
+            print("✅ OpenAI API 連接正常")
+            return True
+    except Exception as e:
+        print(f"❌ OpenAI API 測試失敗: {str(e)}")
+        return False
+
+def test_groq_connection() -> bool:
+    """測試 Groq API 連接"""
+    try:
+        groq_key = os.getenv("GROQ_API_KEY")
         headers = {
-            "Authorization": f"Bearer {GROK_API_KEY}",
+            "Authorization": f"Bearer {groq_key}",
             "Content-Type": "application/json"
         }
         
         payload = {
-            "messages": messages,
-            "model": "grok-beta",
-            "stream": False,
-            "temperature": 0.8,
-            "max_tokens": 300
+            "messages": [{"role": "user", "content": "測試"}],
+            "model": "llama3-70b-8192",
+            "max_tokens": 5
         }
         
         response = requests.post(
-            "https://api.x.ai/v1/chat/completions",
+            "https://api.groq.com/openai/v1/chat/completions",
             headers=headers,
-            json=payload
+            json=payload,
+            timeout=10
         )
         
         if response.status_code == 200:
-            return response.json()["choices"][0]["message"]["content"].strip()
+            print("✅ Groq API 連接正常")
+            return True
         else:
-            return f"Grok API 錯誤: {response.status_code} - {response.text}"
+            print(f"❌ Groq API 測試失敗: {response.status_code} - {response.text}")
+            return False
     except Exception as e:
-        return f"Grok API 錯誤: {str(e)}"
+        print(f"❌ Groq API 測試失敗: {str(e)}")
+        return False
+
 
 def get_ai_response(character: AICharacter, conversation_context: str) -> str:
     """獲取 AI 角色的回應"""
@@ -94,7 +130,7 @@ def get_ai_response(character: AICharacter, conversation_context: str) -> str:
     if character.model_type == "openai":
         return call_openai_api(messages)
     else:
-        return call_grok_api(messages)
+        return call_groq_api(messages)
 
 def start_conversation(topic: str, rounds: int) -> List[Tuple[str, str]]:
     """開始對話"""
@@ -110,7 +146,7 @@ def start_conversation(topic: str, rounds: int) -> List[Tuple[str, str]]:
         
         alice_response = get_ai_response(character_a, context)
         
-        # 博士 (Grok) 回應
+        # 博士 (Groq) 回應
         context = f"話題：{topic}。對方({character_a.name})剛才說：'{alice_response}'。請回應。"
         doctor_response = get_ai_response(character_b, context)
         
@@ -175,7 +211,7 @@ with gr.Blocks(
     
     讓兩個極其尖酸刻薄的 AI 角色互相對話！
     
-    **🎭 毒舌評論家艾莉絲** (GPT-4) VS **🧠 毒嘴哲學家博士** (Grok)
+    **🎭 毒舌評論家艾莉絲** (GPT-4) VS **🧠 毒嘴哲學家博士** (Groq)
     
     ---
     """)
@@ -236,20 +272,46 @@ with gr.Blocks(
     ---
     ### 🔧 技術說明
     - **OpenAI GPT-4**：驅動毒舌評論家艾莉絲
-    - **Grok AI**：驅動毒嘴哲學家博士
+    - **Groq AI**：驅動毒嘴哲學家博士
     - **Gradio**：提供互動介面
     
     *Made with 💀 and a bit of sass*
     """)
 
 if __name__ == "__main__":
-    # 檢查環境變數
-    if not os.getenv("OPENAI_API_KEY"):
-        print("❌ 請設置 OPENAI_API_KEY 環境變數")
-    if not os.getenv("GROK_API_KEY"):
-        print("❌ 請設置 GROK_API_KEY 環境變數")
+    print("🔍 檢查環境變數...")
     
-    print("🚀 啟動毒舌雙雄對話機器人...")
+    # 檢查環境變數
+    openai_key = os.getenv("OPENAI_API_KEY")
+    groq_key = os.getenv("GROQ_API_KEY")
+    
+    if not openai_key:
+        print("❌ 請設置 OPENAI_API_KEY 環境變數")
+        print("   格式：export OPENAI_API_KEY='sk-proj-...'")
+    else:
+        print(f"✅ OpenAI API Key 已設置 (前綴: {openai_key[:20]}...)")
+    
+    if not groq_key:
+        print("❌ 請設置 GROQ_API_KEY 環境變數") 
+        print("   格式：export GROQ_API_KEY='gsk_...'")
+    else:
+        print(f"✅ Groq API Key 已設置 (前綴: {groq_key[:10]}...)")
+    
+    if not openai_key or not groq_key:
+        print("\n請先設置好 API 密鑰再重新運行程序")
+        exit(1)
+    
+    print("\n🧪 測試 API 連接...")
+    openai_ok = test_openai_connection()
+    groq_ok = test_groq_connection()
+    
+    if not openai_ok or not groq_ok:
+        print("\n⚠️  警告：部分 API 無法連接，程序仍會啟動但可能無法正常工作")
+        print("請檢查 API 密鑰設置和網絡連接")
+    else:
+        print("\n🎉 所有 API 連接正常！")
+    
+    print("\n🚀 啟動毒舌雙雄對話機器人...")
     app.launch(
         server_name="0.0.0.0",
         server_port=7860,
