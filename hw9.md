@@ -2,3 +2,6 @@
 
 ---
 ![pic1](attachment/9-1.png)
+![pic2](attachment/9-2.png)
+![pic3](attachment/9-3.png)
+![pic4](attachment/9-4.png)
