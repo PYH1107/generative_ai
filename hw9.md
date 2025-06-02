@@ -1,4 +1,4 @@
 > 一個寧靜的鄉村風景，有著小木屋、翠綠的山丘與晴朗的藍天，以卓别林風格呈現。
 
 ---
-![attachment/ChatGPT Image 2025年6月2日 下午05_30_34.png]
+![pic1](attachment/ChatGPT Image 2025年6月2日 下午05_30_34.png)
